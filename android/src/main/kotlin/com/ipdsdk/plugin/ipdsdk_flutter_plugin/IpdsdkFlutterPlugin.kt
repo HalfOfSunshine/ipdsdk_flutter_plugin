@@ -17,7 +17,7 @@ class IpdsdkFlutterPlugin: FlutterPlugin, MethodCallHandler {
   private lateinit var channel : MethodChannel
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "ipdsdk_flutter_plugin")
+    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "com.ipdsdk.adsdk/method")
     channel.setMethodCallHandler(this)
   }
 

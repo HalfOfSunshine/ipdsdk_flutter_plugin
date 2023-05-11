@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ipdsdk_flutter_plugin/ipdsdk_flutter_plugin_method_channel.dart';
 
 void main() {
-  MethodChannelIpdsdkFlutterPlugin platform = MethodChannelIpdsdkFlutterPlugin();
-  const MethodChannel channel = MethodChannel('ipdsdk_flutter_plugin');
+  MethodChannelIpdsdkFlutterPlugin platform =
+      MethodChannelIpdsdkFlutterPlugin();
+  const MethodChannel channel = MethodChannel('com.ipdsdk.adsdk/method');
 
   TestWidgetsFlutterBinding.ensureInitialized();
 

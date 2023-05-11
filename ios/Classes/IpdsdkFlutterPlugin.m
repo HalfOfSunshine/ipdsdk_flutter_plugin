@@ -38,7 +38,6 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    
     IPDBannerAdPlatformViewFactory *bannerFactory = [[IPDBannerAdPlatformViewFactory alloc] initWithRegistrar:registrar];
     [registrar registerViewFactory:bannerFactory withId:@"com.ipdad.adsdk/banner"];
     
@@ -58,28 +57,15 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
     [registrar registerViewFactory:contentImageTextFactory withId:@"com.ipdad.adsdk/contentVideoImageText"];
     
     [IpdsdkFlutterPlugin shareInstance].messenger = registrar.messenger;
+    [IpdsdkFlutterPlugin shareInstance].methodChannel = [FlutterMethodChannel methodChannelWithName:@"com.ipdsdk.adsdk/method" binaryMessenger:registrar.messenger];
+    [registrar addMethodCallDelegate:[IpdsdkFlutterPlugin shareInstance] channel:[IpdsdkFlutterPlugin shareInstance].methodChannel];
 }
 
-
-
-
-#pragma mark =============== 保存messager，建立接收Flutter通信通道 ===============
-- (void)setMessenger:(NSObject<FlutterBinaryMessenger> *)messenger{
-    _messenger = messenger;
-    
-    ///建立通信通道 用来 监听Flutter 的调用和 调用Fluttter 方法 这里的名称要和Flutter 端保持一致
-    _methodChannel = [FlutterMethodChannel methodChannelWithName:@"com.ipdsdk.adsdk/method" binaryMessenger:messenger];
-    __weak __typeof__(self) weakSelf = self;
-    //  IpdsdkFlutterPlugin* instance = [[IpdsdkFlutterPlugin alloc] init];
-    //  [registrar addMethodCallDelegate:instance channel:channel];
-    [_methodChannel setMethodCallHandler:^(FlutterMethodCall * _Nonnull call, FlutterResult  _Nonnull result) {
-        [weakSelf handleMethodCall:call result:result];
-    }];
-}
 
 #pragma mark -- Flutter 交互监听
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result{
     NSLog(@"ad plugin -> handleMethodCall:%@, args:%@", call.method, call.arguments);
+    
     //监听flutter
     if ([[call method] isEqualToString:@"changeNativeTitle"]) {
         [[NSNotificationCenter defaultCenter]postNotificationName:@"changeNativeTitle" object:call.arguments];
@@ -92,40 +78,28 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
         [self createIPDMethodChannel:call];
     }
     // 调用方法
-    if ([call.method isEqualToString:@"setUserId"]) {
+    if ([@"getPlatformVersion" isEqualToString:call.method]) {
+        result([@"iOS " stringByAppendingString:[[UIDevice currentDevice] systemVersion]]);
+    }else if ([call.method isEqualToString:@"setUserId"]) {
+        //?? 没什么用？
         NSString *uid = call.arguments[@"userId"];
-        
     }else if ([call.method isEqualToString:@"showSplashAd"]) {
-//        NSString *groupId = call.arguments[@"adId"];
-        // 加载开屏广告
         [self loadSplashAd:call];
-        
+    }else if ([call.method isEqualToString:@"registerIPDSDK"]) {
+        [self registerIPDSDK:call];
     }else if (([call.method isEqualToString:@"showRewardVideoAd"])) {
-//        NSString *adId = call.arguments[@"adId"];
         [self loadRewardVideoAd:call];
-        
     }else if ([call.method isEqualToString:@"showInterstitialAd"]) {
-//        NSString *adId = call.arguments[@"adId"];
         [self loadInterstitialAd:call];
-        // 加载插屏广告
-        
     }else if ([call.method isEqualToString:@"showH5Ad"]) {
-        //        NSString *adId = call.arguments[@"adId"];
         [self loadH5Ad:call];
     }else if ([call.method isEqualToString:@"showContentVideoListPage"]) {
-//        IPDContentPageAdapter
         [self showContentVideoListPage:call];
     }else if ([call.method isEqualToString:@"showContentVideoFeedPage"]) {
-//        IPDFeedPageAdapter
-        //        NSString *adId = call.arguments[@"adId"];
         [self showContentVideoFeedPage:call];
     }else if ([call.method isEqualToString:@"showContentVideoHorizontal"]) {
-//        IPDHorizontalFeedAdapter
-        //        NSString *adId = call.arguments[@"adId"];
         [self showContentVideoHorizontal:call];
     }else if ([call.method isEqualToString:@"showContentVideoImageText"]) {
-//        IPDImageTextAdapter
-        //        NSString *adId = call.arguments[@"adId"];
         [self showContentVideoImageText:call];
     }else{
         result(FlutterMethodNotImplemented);
@@ -134,10 +108,9 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
 #pragma mark =============== 广告加载 ===============
 -(void)createIPDMethodChannel:(FlutterMethodCall *)call{
     // 建立监听
-    NSString *channelId = call.arguments[@"_channelId"];
+    NSString *channelId = call.arguments[@"channelId"];
     if ([channelId isKindOfClass:[NSNumber class]]) {
         NSString *channel = [NSString stringWithFormat:@"com.ipdsdk.adsdk/event_%@", channelId];
-//        NSLog(@"建立监听===============com.ipdsdk.adsdk/event_%@",channelId);
         FlutterEventChannel *eventChannel = [FlutterEventChannel eventChannelWithName:channel binaryMessenger:[IpdsdkFlutterPlugin shareInstance].messenger];
         //设置FlutterStreamHandler协议代理
         [eventChannel setStreamHandler:[IpdsdkFlutterPlugin shareInstance]];
@@ -145,10 +118,6 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
     }
 }
 
--(void)initMethodChannelCallBackDelay{
-//    NSLog(@"===delay0.5");
-    [self callbackWithEvent:@"methodChannelCreated" otherDic:nil error:nil];
-}
 /**开屏广告加载*/
 -(void)loadSplashAd:(FlutterMethodCall *)call{
     //--------开屏广告--------
@@ -324,6 +293,24 @@ static IpdsdkFlutterPlugin *ipdsdkFlutterPlugin = nil;
 }
 
 #pragma mark =============== 视频内容各个样式 ===============
+- (void)registerIPDSDK:(FlutterMethodCall *)call{
+    NSDictionary  *dic = call.arguments;
+    NSString *appId = [dic objectForKey:@"appId"];
+    __weak __typeof(self) weakSelf = self;
+    [IPDAdSDK setAppID:appId callback:^(BOOL completed, NSDictionary * _Nonnull info) {
+        if(![info valueForKey:NSLocalizedDescriptionKey]){
+            [info setValue:@" " forKey:NSLocalizedDescriptionKey];
+        }
+        if(completed){
+            [weakSelf callbackWithEvent:@"registerComplete" otherDic:info error:nil];
+        }else{
+            [weakSelf callbackWithEvent:@"registerFail" otherDic:info error:nil];
+        }
+    }];
+    [IPDAdSDK setLogLevel:IPDAdSDKLogLevelDebug];
+    NSString *version = [IPDAdSDK SDKVersion];
+    NSLog(@"IPDSDK version：%@",version);
+}
 /**视频内容列表*/
 -(void)showContentVideoListPage:(FlutterMethodCall *)call{
     NSDictionary  *dic = call.arguments;
